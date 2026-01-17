@@ -1,0 +1,14 @@
+{
+  "CYYZ": { "name": "Toronto Pearson", "city": "Toronto, ON", "lat": 43.68, "lon": -79.63 },
+  "CYVR": { "name": "Vancouver International", "city": "Vancouver, BC", "lat": 49.19, "lon": -123.18 },
+  "CYUL": { "name": "Montreal-Trudeau", "city": "Montreal, QC", "lat": 45.47, "lon": -73.74 },
+  "CYYC": { "name": "Calgary International", "city": "Calgary, AB", "lat": 51.11, "lon": -114.02 },
+  "CYOW": { "name": "Ottawa Macdonald-Cartier", "city": "Ottawa, ON", "lat": 45.32, "lon": -75.67 },
+  "CYWG": { "name": "Winnipeg Richardson", "city": "Winnipeg, MB", "lat": 49.91, "lon": -97.24 },
+  "CYHZ": { "name": "Halifax Stanfield", "city": "Halifax, NS", "lat": 44.88, "lon": -63.51 },
+  "CYEG": { "name": "Edmonton International", "city": "Edmonton, AB", "lat": 53.31, "lon": -113.58 },
+  "CYQB": { "name": "Quebec City Jean Lesage", "city": "Quebec City, QC", "lat": 46.79, "lon": -71.39 },
+  "CYYJ": { "name": "Victoria International", "city": "Victoria, BC", "lat": 48.65, "lon": -123.43 },
+  "CYYT": { "name": "St. John's International", "city": "St. John's, NL", "lat": 47.62, "lon": -52.75 },
+  "CYXE": { "name": "Saskatoon International", "city": "Saskatoon, SK", "lat": 52.17, "lon": -106.7 }
+}
