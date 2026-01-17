@@ -163,16 +163,45 @@
   // ---------------- Normalize input ----------------
   function normalizeFlight(r) {
     const ACID = r.ACID ?? r.id ?? r.callsign ?? "";
+
     const planeType = r["Plane type"] ?? r.planeType ?? r.type ?? "";
-    const from = r["departure airport"] ?? r.departureAirport ?? r.from ?? "";
-    const to = r["arrival airport"] ?? r.arrivalAirport ?? r.to ?? "";
 
-    const depTime = Number(r.depTime ?? r["departure time"] ?? r.departure_time ?? r.departureTime);
-    const arrTime = Number(r.arrTime ?? r["arrival time"] ?? r.arrival_time ?? r.arrivalTime);
+    // ✅ FIX: support nested departure/arrival objects from your JSON
+    const from =
+      r.departure?.icao ??
+      r.departure?.name ??
+      r.departure?.city ??
+      r["departure airport"] ??
+      r.departureAirport ??
+      r.from ??
+      "";
 
-    const aircraftSpeed = Number(r["aircraft speed"] ?? r.aircraftSpeed ?? r.speed ?? 0);
+    const to =
+      r.arrival?.icao ??
+      r.arrival?.name ??
+      r.arrival?.city ??
+      r["arrival airport"] ??
+      r.arrivalAirport ??
+      r.to ??
+      "";
+
+    const depTime = Number(
+      r.depTime ?? r["departure time"] ?? r.departure_time ?? r.departureTime
+    );
+    const arrTime = Number(
+      r.arrTime ?? r["arrival time"] ?? r.arrival_time ?? r.arrivalTime
+    );
+
+    // ✅ FIX: your JSON uses speedKts
+    const aircraftSpeed = Number(
+      r.speedKts ?? r["aircraft speed"] ?? r.aircraftSpeed ?? r.speed ?? 0
+    );
+
     const passengers = Number(r.passengers ?? 0);
     const isCargo = Boolean(r.is_cargo ?? r.isCargo ?? false);
+
+    // Optional but useful: cruise altitude from your JSON
+    const cruiseAltFt = Number(r.cruiseAltFt ?? r.cruiseAlt ?? r.cruiseAltitudeFt ?? 0);
 
     const trajectory = r.trajectory;
 
@@ -186,6 +215,7 @@
       aircraftSpeed,
       passengers,
       isCargo,
+      cruiseAltFt,
       trajectory
     };
   }
@@ -226,13 +256,16 @@
         id: f.ACID,
         lat: p.lat,
         lon: p.lon,
-        altFt: p.altFt ?? 0,
+        altFt: p.altFt ?? f.cruiseAltFt ?? 0,
         heading,
-        speedKts: f.aircraftSpeed,
-        from: f.from,
-        to: f.to,
-        planeType: f.planeType,
-        pax: f.passengers,
+
+        // ✅ Use normalized fields (now correctly set)
+        speedKts: Number(f.aircraftSpeed) || 0,
+        from: f.from ?? "",
+        to: f.to ?? "",
+
+        planeType: f.planeType ?? "",
+        pax: Number(f.passengers) || 0,
         isCargo: f.isCargo ? 1 : 0
       });
     }
@@ -286,9 +319,7 @@
   async function loadFlights() {
     statusEl.textContent = "loading flights_4d.json…";
 
-    // ✅ If your file is flights.4d.json, change this to "./flights.4d.json"
     const res = await fetch("./flights_4d.json", { cache: "no-store" });
-
     if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`);
 
     const raw = await res.json();
@@ -350,12 +381,14 @@
       const conflictIds = detectLossOfSeparation(planesAtT, 5, 2000);
       if (conflictIds.size > 0 && !firstConflict) {
         firstConflict = { t, ids: [...conflictIds] };
-        // keep scanning to still report closest approach
       }
 
       const ca = closestApproachAtT(planesAtT);
-      if (ca.a && (ca.horizNm < globalClosest.horizNm ||
-          (ca.horizNm === globalClosest.horizNm && ca.vertFt < globalClosest.vertFt))) {
+      if (
+        ca.a &&
+        (ca.horizNm < globalClosest.horizNm ||
+          (ca.horizNm === globalClosest.horizNm && ca.vertFt < globalClosest.vertFt))
+      ) {
         globalClosest = { ...ca, t };
       }
     }
@@ -395,8 +428,8 @@
         source: "routes",
         paint: {
           "line-color": "#007BFF",
-          "line-width": 3,
-          "line-opacity": 0.85
+          "line-width": 0.85,
+          "line-opacity": 0.5
         }
       });
 
@@ -406,17 +439,9 @@
         type: "circle",
         source: "planes",
         paint: {
-          "circle-radius": [
-            "interpolate", ["linear"], ["zoom"],
-            3, 8,
-            8, 14
-          ],
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 8, 8, 14],
           "circle-color": "#FF3333",
-          "circle-opacity": [
-            "case",
-            ["==", ["get", "conflict"], 1], 0.55,
-            0
-          ]
+          "circle-opacity": ["case", ["==", ["get", "conflict"], 1], 0.55, 0]
         }
       });
 
@@ -430,14 +455,7 @@
         source: "planes",
         layout: {
           "icon-image": "plane-icon",
-          "icon-size": [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            3, 0.06,
-            6, 0.08,
-            10, 0.10
-          ],
+          "icon-size": ["interpolate", ["linear"], ["zoom"], 3, 0.06, 6, 0.08, 10, 0.10],
           "icon-anchor": "center",
           "icon-allow-overlap": true,
           "icon-ignore-placement": true,
@@ -518,6 +536,78 @@
         requestAnimationFrame(tick);
       }
       requestAnimationFrame(tick);
+
+      (function makeDraggableBackgroundOnly(selector) {
+  const panel = document.querySelector(selector);
+  if (!panel) return;
+
+  let dragging = false;
+  let startX = 0, startY = 0;
+  let startLeft = 0, startTop = 0;
+
+  // Initialize left/top from current position
+  const initRect = panel.getBoundingClientRect();
+  panel.style.left = panel.style.left || `${initRect.left}px`;
+  panel.style.top  = panel.style.top  || `${initRect.top}px`;
+
+  const shouldStartDrag = (e) => {
+    // Only drag if the user clicked directly on the panel background,
+    // not on any child (text, buttons, selects, etc.)
+    return e.target === panel;
+  };
+
+  const onDown = (e) => {
+    if (!shouldStartDrag(e)) return;
+
+    const p = e.touches ? e.touches[0] : e;
+    dragging = true;
+
+    const rect = panel.getBoundingClientRect();
+    startLeft = rect.left;
+    startTop = rect.top;
+    startX = p.clientX;
+    startY = p.clientY;
+
+    e.preventDefault?.();
+  };
+
+  const onMove = (e) => {
+    if (!dragging) return;
+
+    const p = e.touches ? e.touches[0] : e;
+    const dx = p.clientX - startX;
+    const dy = p.clientY - startY;
+
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const rect = panel.getBoundingClientRect();
+
+    let newLeft = startLeft + dx;
+    let newTop = startTop + dy;
+
+    // Clamp inside viewport
+    newLeft = Math.max(0, Math.min(vw - rect.width, newLeft));
+    newTop  = Math.max(0, Math.min(vh - rect.height, newTop));
+
+    panel.style.left = `${newLeft}px`;
+    panel.style.top = `${newTop}px`;
+  };
+
+  const onUp = () => {
+    dragging = false;
+  };
+
+  // Mouse
+  panel.addEventListener("mousedown", onDown);
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", onUp);
+
+  // Touch
+  panel.addEventListener("touchstart", onDown, { passive: false });
+  window.addEventListener("touchmove", onMove, { passive: false });
+  window.addEventListener("touchend", onUp);
+})(".layout .hud");
+
 
     } catch (err) {
       console.error(err);

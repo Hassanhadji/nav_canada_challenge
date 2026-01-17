@@ -4,6 +4,10 @@ html, body { height: 100%; margin: 0; font-family: system-ui, Arial, sans-serif;
 /* Mapbox canvas container */
 #map { position: absolute; inset: 0; width: 100%; height: 100%; }
 
+#option {
+  color: #000;
+}
+
 /* HUD overlay */
 .hud {
   position: absolute;
@@ -18,9 +22,25 @@ html, body { height: 100%; margin: 0; font-family: system-ui, Arial, sans-serif;
   backdrop-filter: blur(8px);
 }
 
+.layout .hud {
+  position: fixed;   /* required so left/top can move it */
+  left: 16px;
+  top: 16px;
+  z-index: 9999;
+  cursor: grab;
+}
+
+.layout .hud:active {
+  cursor: grabbing;
+}
+
+
 .title { font-weight: 700; margin-bottom: 10px; }
 .row { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
-.label { opacity: 0.85; font-size: 13px; }
+.label { 
+  opacity: 0.85;
+  font-size: 13px;
+  font-style: normal; }
 .mono { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
 .small { opacity: 0.8; font-size: 12px; }
 .spacer { flex: 1; }
